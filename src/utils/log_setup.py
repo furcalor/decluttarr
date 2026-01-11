@@ -44,8 +44,15 @@ def set_handler_format(log_handler, *, long_format=True):
 
 
 # Default console handler with UTF-8 encoding to handle Unicode characters on Windows
-utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-console_handler = logging.StreamHandler(stream=utf8_stdout)
+# On Windows, stdout may use a locale-specific encoding (e.g., cp1252) that cannot encode
+# certain Unicode characters. We wrap stdout with UTF-8 encoding only on Windows.
+if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
+    console_stream = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", errors="replace"
+    )
+else:
+    console_stream = sys.stdout
+console_handler = logging.StreamHandler(stream=console_stream)
 set_handler_format(console_handler, long_format=True)
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
