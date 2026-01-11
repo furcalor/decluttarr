@@ -15,14 +15,18 @@ class SafeStreamHandler(logging.StreamHandler):
             msg = self.format(record)
             stream = self.stream
             # On Windows, the stream encoding may not support all Unicode characters.
-            # We always encode with 'replace' to substitute unencodable characters,
-            # then decode back to a string for writing.
+            # We encode to bytes using the stream's encoding with 'replace' error handling,
+            # which substitutes unencodable characters with '?'.
             encoding = getattr(stream, "encoding", None) or "utf-8"
-            safe_msg = msg.encode(encoding, errors="replace").decode(
-                encoding, errors="replace"
-            )
-            stream.write(safe_msg + self.terminator)
-            self.flush()
+            safe_bytes = (msg + self.terminator).encode(encoding, errors="replace")
+            # Write bytes directly to the buffer to bypass Python's encoding
+            if hasattr(stream, "buffer"):
+                stream.buffer.write(safe_bytes)
+                stream.buffer.flush()
+            else:
+                # Fallback: decode back and write as string
+                stream.write(safe_bytes.decode(encoding, errors="replace"))
+                stream.flush()
         except RecursionError:
             # Re-raise to prevent infinite recursion in logging error handlers
             raise
