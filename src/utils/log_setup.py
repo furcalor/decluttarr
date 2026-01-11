@@ -1,4 +1,6 @@
+import io
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -41,8 +43,9 @@ def set_handler_format(log_handler, *, long_format=True):
     log_handler.setFormatter(target_format)
 
 
-# Default console handler
-console_handler = logging.StreamHandler()
+# Default console handler with UTF-8 encoding to handle Unicode characters on Windows
+utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+console_handler = logging.StreamHandler(stream=utf8_stdout)
 set_handler_format(console_handler, long_format=True)
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
