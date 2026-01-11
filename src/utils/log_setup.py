@@ -14,20 +14,22 @@ class SafeStreamHandler(logging.StreamHandler):
         try:
             msg = self.format(record)
             stream = self.stream
-            try:
-                stream.write(msg + self.terminator)
-            except UnicodeEncodeError:
-                # Replace unencodable characters with '?' and try again
-                safe_msg = msg.encode(
-                    stream.encoding or "utf-8", errors="replace"
-                ).decode("utf-8", errors="replace")
-                stream.write(safe_msg + self.terminator)
+            # On Windows, the stream encoding may not support all Unicode characters.
+            # We always encode with 'replace' to substitute unencodable characters,
+            # then decode back to a string for writing.
+            encoding = getattr(stream, "encoding", None) or "utf-8"
+            safe_msg = msg.encode(encoding, errors="replace").decode(
+                encoding, errors="replace"
+            )
+            stream.write(safe_msg + self.terminator)
             self.flush()
         except RecursionError:
             # Re-raise to prevent infinite recursion in logging error handlers
             raise
         except Exception:  # noqa: BLE001
-            self.handleError(record)
+            # Silently ignore errors to prevent cascading failures
+            # Don't call handleError() as it may also fail with UnicodeEncodeError
+            pass
 
 
 def add_logging_level(level_name, level_num):
