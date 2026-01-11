@@ -1,4 +1,3 @@
-import io
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
@@ -6,6 +5,28 @@ from pathlib import Path
 
 # Track added logging levels
 _added_levels = {}
+
+
+class SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler that handles Unicode encoding errors gracefully on Windows."""
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            try:
+                stream.write(msg + self.terminator)
+            except UnicodeEncodeError:
+                # Replace unencodable characters and try again
+                encoded = msg.encode(
+                    stream.encoding or "utf-8", errors="replace"
+                ).decode(stream.encoding or "utf-8", errors="replace")
+                stream.write(encoded + self.terminator)
+            self.flush()
+        except RecursionError:
+            raise
+        except Exception:  # noqa: BLE001
+            self.handleError(record)
 
 
 def add_logging_level(level_name, level_num):
@@ -43,16 +64,10 @@ def set_handler_format(log_handler, *, long_format=True):
     log_handler.setFormatter(target_format)
 
 
-# Default console handler with UTF-8 encoding to handle Unicode characters on Windows
+# Default console handler with safe Unicode handling for Windows
 # On Windows, stdout may use a locale-specific encoding (e.g., cp1252) that cannot encode
-# certain Unicode characters. We wrap stdout with UTF-8 encoding only on Windows.
-if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
-    console_stream = io.TextIOWrapper(
-        sys.stdout.buffer, encoding="utf-8", errors="replace"
-    )
-else:
-    console_stream = sys.stdout
-console_handler = logging.StreamHandler(stream=console_stream)
+# certain Unicode characters. SafeStreamHandler handles encoding errors gracefully.
+console_handler = SafeStreamHandler(stream=sys.stdout)
 set_handler_format(console_handler, long_format=True)
 logger.addHandler(console_handler)
 logger.setLevel(logging.INFO)
