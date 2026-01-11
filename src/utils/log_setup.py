@@ -17,13 +17,14 @@ class SafeStreamHandler(logging.StreamHandler):
             try:
                 stream.write(msg + self.terminator)
             except UnicodeEncodeError:
-                # Replace unencodable characters and try again
-                encoded = msg.encode(
+                # Replace unencodable characters with '?' and try again
+                safe_msg = msg.encode(
                     stream.encoding or "utf-8", errors="replace"
-                ).decode(stream.encoding or "utf-8", errors="replace")
-                stream.write(encoded + self.terminator)
+                ).decode("utf-8", errors="replace")
+                stream.write(safe_msg + self.terminator)
             self.flush()
         except RecursionError:
+            # Re-raise to prevent infinite recursion in logging error handlers
             raise
         except Exception:  # noqa: BLE001
             self.handleError(record)
